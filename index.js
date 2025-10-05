@@ -16,7 +16,7 @@ app.post('/', async (req, res) => {
   try {
     const trxid = crypto.randomBytes(8).toString("hex");
     const orderid = crypto.randomBytes(8).toString("hex");
-    console.log("The orderid is " + orderId);
+    console.log("The orderid is " + orderid);
     console.log("The trxid is " + trxid);
     console.log("The password is " + process.env.MASTERCARD_AUTH_TOKEN);
     
@@ -29,7 +29,7 @@ app.post('/', async (req, res) => {
             "billingAddress": "HIDE"
         },
         "merchant": { 
-          "name": process.env.MERCHANT_NAME || "JK Enterprises LLC",
+          "name": process.env.MERCHANT_NAME || "ABC Enterprises LLC",
           "url": process.env.MERCHANT_URL || "https://mastercard.com"
         },
         "returnUrl": process.env.RETURN_URL || "https://hosted-checkout-embedded-page.vercel.app/ReceiptPage"
