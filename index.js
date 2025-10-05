@@ -16,6 +16,9 @@ app.post('/', async (req, res) => {
   try {
     const trxid = crypto.randomBytes(8).toString("hex");
     const orderid = crypto.randomBytes(8).toString("hex");
+    console.log("The orderid is " + orderId);
+    console.log("The trxid is " + trxid);
+    console.log("The password is " + process.env.MASTERCARD_AUTH_TOKEN);
     
     const postData = {
       "apiOperation": "INITIATE_CHECKOUT",
