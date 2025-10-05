@@ -11,6 +11,19 @@ app.use(cors());
 app.use(express.json());
 
 const port = process.env.PORT || 3005;
+// Health check endpoint
+app.get('/', (req, res) => {
+  res.json({ 
+    status: 'ok', 
+    message: 'Mastercard Payment Gateway API',
+    timestamp: new Date().toISOString()
+  });
+});
+
+// Favicon handler (prevents 404s)
+app.get('/favicon.ico', (req, res) => {
+  res.status(204).end();
+});
 
 app.post('/', async (req, res) => {
   try {
