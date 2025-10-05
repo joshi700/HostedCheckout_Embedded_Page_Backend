@@ -14,8 +14,8 @@ const port = process.env.PORT || 3005;
 
 app.post('/', async (req, res) => {
   try {
-    const trxid = crypto.randomBytes(16).toString("hex");
-    const orderid = crypto.randomBytes(16).toString("hex");
+    const trxid = crypto.randomBytes(8).toString("hex");
+    const orderid = crypto.randomBytes(8).toString("hex");
     
     const postData = {
       "apiOperation": "INITIATE_CHECKOUT",
