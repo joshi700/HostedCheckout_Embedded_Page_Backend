@@ -32,6 +32,7 @@ app.post('/', async (req, res) => {
     console.log("The orderid is " + orderid);
     console.log("The trxid is " + trxid);
     console.log("The password is " + process.env.MASTERCARD_AUTH_TOKEN);
+    console.log("The API Version is " + process.env.API_VERSION);
     
     const postData = {
       "apiOperation": "INITIATE_CHECKOUT",
@@ -69,7 +70,11 @@ app.post('/', async (req, res) => {
     
     console.log("RESPONSE RECEIVED Create: ", response.data.session.id);
     const sessionId = response.data.session.id;
-
+    console.log("The orderid is " + orderid);
+    console.log("The trxid is " + trxid);
+    console.log("The password is " + process.env.MASTERCARD_AUTH_TOKEN);
+    console.log("The API Version is " + process.env.API_VERSION);
+    console.log("The sessionId in backend is " + sessionId);
     res.send(sessionId);
   } catch (error) {
     console.error("Error:", error);
