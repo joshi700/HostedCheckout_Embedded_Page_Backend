@@ -50,15 +50,53 @@ const ADDRESS = {
 
 // The basket is the single source of truth for the amount. The gateway rejects
 // a session unless itemAmount + tax - discount equals the total exactly.
-const BASKET = [
+const DEFAULT_BASKET = [
   { name: "Premium Watch", description: "Stainless steel, 42 mm", quantity: 1, unitPrice: 99.0 },
 ];
+
+// TechGear storefront catalogue. Prices live here, not in the browser: the
+// frontend sends only product ids and quantities, so a shopper can't change
+// what they're charged. Keep in step with PRODUCTS in the frontend's
+// src/techgear/Storefront.jsx.
+const CATALOG = {
+  "mechkey-pro-60": { name: "MechKey Pro 60%", description: "60% mechanical keyboard", unitPrice: 249.0 },
+  "velocity-wireless": { name: "Velocity Wireless", description: "Wireless gaming mouse", unitPrice: 149.0 },
+  "sonic-blast-headset": { name: "Sonic Blast Headset", description: "Wireless gaming headset", unitPrice: 199.0 },
+  "spectre-x15": { name: "Spectre X15 Laptop", description: "15.6 in creator laptop", unitPrice: 1299.0 },
+};
+
+// Turn [{ id, qty }] from the request into basket lines. Unknown ids and bad
+// quantities are dropped; an empty result falls back to DEFAULT_BASKET.
+function basketFrom(items) {
+  if (!Array.isArray(items)) return DEFAULT_BASKET;
+  const lines = items
+    .filter((i) => i && CATALOG[i.id] && Number.isInteger(i.qty) && i.qty >= 1 && i.qty <= 9)
+    .map((i) => ({ ...CATALOG[i.id], quantity: i.qty }));
+  return lines.length ? lines : DEFAULT_BASKET;
+}
+
+// After paying, the gateway sends the shopper to returnUrl. Only origins we
+// deploy the frontend to are accepted, so the backend can't be used to
+// redirect elsewhere.
+const ALLOWED_RETURN_ORIGINS = (process.env.ALLOWED_RETURN_ORIGINS ||
+  "https://hosted-checkout-embedded-page.vercel.app,http://localhost:3000")
+  .split(",").map((o) => o.trim()).filter(Boolean);
+const PREVIEW_ORIGIN = /^https:\/\/hosted-checkout-embedded-page-[a-z0-9-]+\.vercel\.app$/;
+
+function returnUrlFrom(requested) {
+  const fallback = process.env.RETURN_URL || "https://hosted-checkout-embedded-page.vercel.app/ReceiptPage";
+  try {
+    const url = new URL(requested);
+    if (ALLOWED_RETURN_ORIGINS.includes(url.origin) || PREVIEW_ORIGIN.test(url.origin)) return url.toString();
+  } catch { /* not a URL */ }
+  return fallback;
+}
 
 const cents = (n) => Math.round(n * 100);
 const dollars = (c) => (c / 100).toFixed(2);
 
-function buildCheckout({ orderId, returnUrl }) {
-  const itemCents = BASKET.reduce((n, i) => n + cents(i.unitPrice) * i.quantity, 0);
+function buildCheckout({ orderId, returnUrl, basket }) {
+  const itemCents = basket.reduce((n, i) => n + cents(i.unitPrice) * i.quantity, 0);
   const taxCents = 0;
 
   return {
@@ -82,7 +120,7 @@ function buildCheckout({ orderId, returnUrl }) {
       amount: dollars(itemCents + taxCents),
       itemAmount: dollars(itemCents),
       taxAmount: dollars(taxCents),
-      item: BASKET.map((i) => ({
+      item: basket.map((i) => ({
         name: i.name,
         description: i.description,
         quantity: i.quantity,
@@ -115,9 +153,11 @@ app.post('/', async (req, res) => {
   try {
     const orderid = crypto.randomBytes(8).toString("hex");
 
+    const body = req.body || {};
     const postData = buildCheckout({
       orderId: orderid,
-      returnUrl: process.env.RETURN_URL || "https://hosted-checkout-embedded-page.vercel.app/ReceiptPage",
+      returnUrl: returnUrlFrom(body.returnUrl),
+      basket: basketFrom(body.items),
     });
 
     const axiosConfig = {
@@ -135,10 +175,19 @@ app.post('/', async (req, res) => {
 
     // In embedded mode Mastercard shows only the payment form, so the merchant
     // page draws the order summary itself. A client that asks for JSON gets the
-    // order to render; any other client still gets the bare session id, so the
-    // current frontend keeps working unchanged.
-    if ((req.headers.accept || '').includes('application/json')) {
-      return res.json({ sessionId, order: postData.order });
+    // order to render, plus the successIndicator: on return, the gateway's
+    // resultIndicator must equal it for the payment to count as successful.
+    // Any other client still gets the bare session id, as before.
+    if ((req.headers.accept || '').includes('application/json') || body.responseFormat === 'json') {
+      return res.json({
+        sessionId,
+        successIndicator: response.data.successIndicator,
+        orderId: orderid,
+        amount: postData.order.amount,
+        currency: postData.order.currency,
+        items: postData.order.item,
+        order: postData.order,
+      });
     }
     res.send(sessionId);
   } catch (error) {
